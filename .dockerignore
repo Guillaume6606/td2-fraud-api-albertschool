@@ -1,0 +1,9 @@
+*
+!pyproject.toml
+!uv.lock
+!app.py
+!features.py
+!scoring.py
+!settings.py
+!models/model.ubj
+!models/features.json

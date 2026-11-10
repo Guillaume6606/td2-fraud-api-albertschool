@@ -1,0 +1,32 @@
+{
+ "model": "model.ubj",
+ "features": [
+  "amount",
+  "log_amount",
+  "hour",
+  "weekday",
+  "is_weekend",
+  "cust_n_1d",
+  "cust_amount_mean_1d",
+  "amount_ratio_1d",
+  "cust_n_7d",
+  "cust_amount_mean_7d",
+  "amount_ratio_7d",
+  "cust_n_14d",
+  "cust_amount_mean_14d",
+  "amount_ratio_14d",
+  "term_n_1d",
+  "term_fraud_rate_1d",
+  "term_n_7d",
+  "term_fraud_rate_7d",
+  "term_n_14d",
+  "term_fraud_rate_14d"
+ ],
+ "windows_days": [
+  1,
+  7,
+  14
+ ],
+ "label_delay_days": 7,
+ "dtype": "float32"
+}

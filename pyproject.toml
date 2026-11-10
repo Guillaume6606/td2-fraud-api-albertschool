@@ -1,0 +1,46 @@
+[project]
+name = "td2-fraud-api"
+version = "0.1.0"
+description = "TD2 - service de scoring de fraude (FraudFinder, XGBoost, FastAPI) à déployer sur Cloud Run"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "xgboost>=3.4,<4",
+    "numpy>=2.0,<3",
+    "pyarrow>=18",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "psutil>=6",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8",
+    "ruff>=0.6",
+]
+stream = [
+    "google-cloud-pubsub>=2.23",
+    "httpx>=0.27",
+]
+train = [
+    "google-cloud-bigquery>=3.25",
+    "google-cloud-bigquery-storage>=2.27",
+    "pandas>=3.0,<4",
+    "scikit-learn>=1.5",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
