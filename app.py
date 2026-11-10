@@ -1,41 +1,117 @@
-"""Service de scoring : POST /predict.
+"""Service de scoring : GET /health, POST /predict, POST /events.
 
-Version de départ du TD2. Elle répond juste, mais trois points sont à reprendre à l'étape 0.
+Le modèle et les compteurs journaliers sont chargés une fois par worker, au démarrage.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+import os
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from time import perf_counter
 
 import numpy as np
+import psutil
 from fastapi import FastAPI, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 import features as ft
 import scoring
 import settings
 
-app = FastAPI(title="TD2 fraud API")
+
+class Transaction(BaseModel):
+    """Une transaction FraudFinder ; les noms en majuscules du flux (TX_ID...) sont acceptés."""
+
+    model_config = ConfigDict(alias_generator=str.upper, populate_by_name=True)
+
+    tx_id: str
+    tx_ts: datetime
+    customer_id: str
+    terminal_id: str
+    tx_amount: float = Field(gt=0)
 
 
-@app.post("/predict")
-async def predict(request: Request):
-    body = await request.json()
+class PredictRequest(BaseModel):
+    transactions: list[Transaction]
+
+
+class ScoredTransaction(BaseModel):
+    tx_id: str
+    score: float
+
+
+class PredictResponse(BaseModel):
+    scores: list[ScoredTransaction]
+    timings_ms: dict[str, float]
+    worker_pid: int
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     cfg = settings.from_env()
-    model = scoring.load_model(cfg.models_dir, cfg.xgb_nthread)
-    state = ft.load_state(cfg.data_dir, cfg.horizon_days)
-    transactions = body["transactions"]
-    ts = np.array([datetime.fromisoformat(t["tx_ts"]) for t in transactions], dtype="datetime64[s]")
-    scores, _ = scoring.score(
-        state,
-        model,
-        ts,
-        [t["customer_id"] for t in transactions],
-        [t["terminal_id"] for t in transactions],
-        np.array([t["tx_amount"] for t in transactions], dtype=np.float64),
+    app.state.cfg = cfg
+    app.state.model = scoring.load_model(cfg.models_dir, cfg.xgb_nthread)
+    app.state.features = ft.load_state(cfg.data_dir, cfg.horizon_days)
+    yield
+
+
+app = FastAPI(title="TD2 fraud API", lifespan=lifespan)
+
+
+def _utc_naive(ts: datetime) -> datetime:
+    return ts.astimezone(UTC).replace(tzinfo=None) if ts.tzinfo else ts
+
+
+def _arrays(transactions: list[Transaction]):
+    ts = np.array([_utc_naive(t.tx_ts) for t in transactions], dtype="datetime64[s]")
+    amount = np.array([t.tx_amount for t in transactions], dtype=np.float64)
+    return ts, [t.customer_id for t in transactions], [t.terminal_id for t in transactions], amount
+
+
+def _predict(req: PredictRequest, request: Request, record: bool) -> PredictResponse:
+    start = perf_counter()
+    st = request.app.state
+    ts, customers, terminals, amount = _arrays(req.transactions)
+    scores, tm = scoring.score(st.features, st.model, ts, customers, terminals, amount)
+    if record:
+        for t, c, term, a in zip(ts, customers, terminals, amount, strict=True):
+            st.features.add_transaction(t, c, term, float(a))
+    return PredictResponse(
+        scores=[
+            ScoredTransaction(tx_id=t.tx_id, score=float(s))
+            for t, s in zip(req.transactions, scores, strict=True)
+        ],
+        timings_ms={
+            "features": tm.features * 1000,
+            "predict": tm.predict * 1000,
+            "handler": (perf_counter() - start) * 1000,
+        },
+        worker_pid=os.getpid(),
     )
+
+
+@app.get("/health")
+def health(request: Request):
+    state = request.app.state.features
     return {
-        "scores": [
-            {"tx_id": t["tx_id"], "score": float(s)}
-            for t, s in zip(transactions, scores, strict=True)
-        ]
+        "status": "ok",
+        "pid": os.getpid(),
+        "features": len(ft.feature_names()),
+        "customers": len(state.customers.index),
+        "terminals": len(state.terminals.index),
+        "last_day": str(state.day0 + np.timedelta64(state.last_day, "D")),
+        "rss_mb": round(psutil.Process().memory_info().rss / 2**20, 1),
     }
+
+
+@app.post("/predict", response_model=PredictResponse)
+def predict(req: PredictRequest, request: Request) -> PredictResponse:
+    """Score sans rien mémoriser : deux appels identiques donnent la même réponse."""
+    return _predict(req, request, record=False)
+
+
+@app.post("/events", response_model=PredictResponse)
+def events(req: PredictRequest, request: Request) -> PredictResponse:
+    """Score puis enregistre les transactions dans les compteurs du worker (flux)."""
+    return _predict(req, request, record=True)

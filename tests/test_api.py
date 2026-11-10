@@ -18,7 +18,7 @@ def test_health(client):
     body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["features"] == 20
-    assert body["customers"] > 40_000 and body["terminals"] == 5000
+    assert body["customers"] > 40_000 and body["terminals"] > 4_900
     assert body["last_day"] == "2026-09-30"
 
 

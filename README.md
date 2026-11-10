@@ -35,12 +35,12 @@ Les compteurs s'arrêtent au 30 septembre 2026. Les transactions à scorer comme
 
 | Fichier | Rôle |
 | --- | --- |
-| `app.py` | service FastAPI, **à reprendre à l'étape 0** |
+| `app.py` | service FastAPI |
 | `features.py` | compteurs journaliers et calcul des 20 variables |
 | `scoring.py` | chargement du modèle, calcul des scores |
 | `settings.py` | variables `DATA_DIR`, `MODELS_DIR`, `XGB_NTHREAD` |
 | `models/` | modèle, liste des variables, scores de référence |
-| `tests/` | ce que le service doit vérifier à la fin de l'étape 0 |
+| `tests/` | tests du service |
 
 Le modèle est dans l'image. Les fichiers de `data/` n'y sont pas : le service les lit dans le dossier
 `DATA_DIR`.
@@ -53,27 +53,6 @@ uv run uvicorn app:app --port 8000
 ```
 
 Placez dans `data/` les trois fichiers parquet indiqués par l'enseignant.
-
-## Étape 0 — Mettre le service à niveau
-
-Le service de départ répond juste, mais :
-
-1. il relit le modèle et les compteurs à chaque demande ;
-2. il ne vérifie pas le contenu des demandes ;
-3. il n'a pas de point de contrôle de santé.
-
-À faire dans `app.py` :
-
-1. charger le modèle et les compteurs une seule fois, au démarrage ;
-2. décrire la demande et la réponse avec des schémas Pydantic : une transaction invalide doit
-   recevoir un code 422, et les noms en majuscules de FraudFinder (`TX_ID`, `TX_TS`, `CUSTOMER_ID`,
-   `TERMINAL_ID`, `TX_AMOUNT`) doivent être acceptés ;
-3. ajouter `GET /health`, qui renvoie `status` (`"ok"`), `features` (nombre de variables),
-   `customers` et `terminals` (nombre d'identifiants chargés) et `last_day` (dernier jour connu) ;
-4. ajouter à la réponse de `/predict` le champ `timings_ms` avec les durées `features`, `predict`
-   et `handler` en millisecondes.
-
-L'étape est finie quand `uv run pytest` passe. Mesurez la durée d'une demande avant et après.
 
 ## Image
 
