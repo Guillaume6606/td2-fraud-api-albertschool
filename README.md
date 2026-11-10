@@ -68,7 +68,10 @@ Le service de départ répond juste, mais :
 2. décrire la demande et la réponse avec des schémas Pydantic : une transaction invalide doit
    recevoir un code 422, et les noms en majuscules de FraudFinder (`TX_ID`, `TX_TS`, `CUSTOMER_ID`,
    `TERMINAL_ID`, `TX_AMOUNT`) doivent être acceptés ;
-3. ajouter `GET /health`.
+3. ajouter `GET /health`, qui renvoie `status` (`"ok"`), `features` (nombre de variables),
+   `customers` et `terminals` (nombre d'identifiants chargés) et `last_day` (dernier jour connu) ;
+4. ajouter à la réponse de `/predict` le champ `timings_ms` avec les durées `features`, `predict`
+   et `handler` en millisecondes.
 
 L'étape est finie quand `uv run pytest` passe. Mesurez la durée d'une demande avant et après.
 
