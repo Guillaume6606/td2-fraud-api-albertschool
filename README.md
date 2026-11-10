@@ -60,3 +60,10 @@ Placez dans `data/` les trois fichiers parquet indiqués par l'enseignant.
 docker build --platform linux/amd64 -t fraud-api .
 docker run --rm -p 8000:8000 -v "$PWD/data:/app/data:ro" fraud-api
 ```
+
+Variante avancée, `Dockerfile.advanced` : image de runtime distroless (ni shell ni gestionnaire de
+paquets, utilisateur `nonroot`), cache de build uv, contrôle de santé intégré.
+
+```bash
+docker build -f Dockerfile.advanced --platform linux/amd64 -t fraud-api:advanced .
+```
